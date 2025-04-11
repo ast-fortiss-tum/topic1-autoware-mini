@@ -9,6 +9,7 @@ ground truth localization. Publishes the following topics:
     current_velocty (geometry_msgs::TwistStamped)
     current_pose    (geometry_msgs::PoseStamped)
 """
+import time
 import rospy
 import numpy as np
 
@@ -18,6 +19,7 @@ from tf2_ros import TransformBroadcaster, TransformListener, Buffer, TransformEx
 from geometry_msgs.msg import PoseStamped, TwistStamped, TransformStamped, Pose
 from nav_msgs.msg import Odometry
 from localization.SimulationToUTMTransformer import SimulationToUTMTransformer
+from std_msgs.msg import Float64MultiArray
 
 class CarlaLocalizer:
 
@@ -37,7 +39,11 @@ class CarlaLocalizer:
         self.pose_pub = rospy.Publisher('current_pose', PoseStamped, queue_size=1, tcp_nodelay=True)
         self.twist_pub = rospy.Publisher('current_velocity', TwistStamped, queue_size=1, tcp_nodelay=True)
         self.odom_pub = rospy.Publisher('odometry', Odometry, queue_size=1, tcp_nodelay=True)
-
+        self.exec_time_pub = rospy.Publisher(
+                              f"/{rospy.get_name()}/exec_time_with_stamp",
+                              Float64MultiArray,
+                              queue_size=10
+                             )  
         # TF Broadcaster and Listener
         self.tf_broadcaster = TransformBroadcaster()
         self.tf_buffer = Buffer()
@@ -55,7 +61,14 @@ class CarlaLocalizer:
         """
         callback odometry
         """
-
+   
+        start_time = time.time()
+        try:
+          stampe = msg.header.stamp.to_sec()
+          if stampe == 0.0:
+           raise ValueError("Zero stamp")
+        except:
+          stampe = rospy.get_rostime().to_sec() 
         if self.use_transformer:
             new_pose = self.sim2utm_transformer.transform_pose(msg.pose.pose)
         else:
@@ -96,7 +109,12 @@ class CarlaLocalizer:
         odom.pose.pose = pose
         odom.twist.twist = current_velocity.twist
         self.odom_pub.publish(odom)
-     
+        exec_duration = time.time() - start_time
+        timing_msg = Float64MultiArray()
+        timing_msg.data = [stampe, exec_duration]
+        self.exec_time_pub.publish(timing_msg)
+
+        rospy.loginfo(f"[{rospy.get_name()}] Exec time: {exec_duration:.6f}s | Stamp: {stampe:.3f}")
 
     def run(self):
         rospy.spin()

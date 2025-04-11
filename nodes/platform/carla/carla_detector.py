@@ -8,9 +8,10 @@
 ground truth detections. Publishes the following topics:
     receive :derived_object_msgs::ObjectArray and publishes autoware_msgs::DetectedObjectArray
 """
+import time
 import rospy
 
-from std_msgs.msg import ColorRGBA
+from std_msgs.msg import ColorRGBA,Float64MultiArray
 from geometry_msgs.msg import PolygonStamped, Point
 from autoware_msgs.msg import DetectedObjectArray, DetectedObject
 from derived_object_msgs.msg import ObjectArray, Object
@@ -44,7 +45,11 @@ class CarlaDetector:
         utm_origin_lat = rospy.get_param("/localization/utm_origin_lat")
         utm_origin_lon = rospy.get_param("/localization/utm_origin_lon")
         self.output_frame = rospy.get_param("/detection/output_frame")
-
+        self.exec_time_pub = rospy.Publisher(
+                              f"/{rospy.get_name()}/exec_time_with_stamp",
+                              Float64MultiArray,
+                              queue_size=10
+                             )  
         # Internal parameters
         self.sim2utm_transformer = SimulationToUTMTransformer(use_custom_origin=use_custom_origin,
                                                               origin_lat=utm_origin_lat,
@@ -62,7 +67,13 @@ class CarlaDetector:
         """
         callback for carla objects
         """
-
+        start_time = time.time().to_sec()
+        try:
+         stampe = data.header.stamp.to_sec()
+         if stampe == 0.0:
+          raise ValueError("Zero stamp")
+        except:
+         stampe = rospy.get_rostime().to_sec()  
         objects_msg = DetectedObjectArray()
         objects_msg.header = data.header
 
@@ -93,9 +104,15 @@ class CarlaDetector:
             object_msg.valid = True
 
             objects_msg.objects.append(object_msg)
+        exec_duration = time.time()- start_time
+        timing_msg = Float64MultiArray()
+        timing_msg.data = [stampe, exec_duration]
+        self.exec_time_pub.publish(timing_msg)
 
+        rospy.loginfo(f"[{rospy.get_name()}] Exec time: {exec_duration:.6f}s | Stamp: {stampe:.3f}")
         # Publish converted detected objects
         self.detected_objects_pub.publish(objects_msg)
+
 
     def run(self):
         rospy.spin()

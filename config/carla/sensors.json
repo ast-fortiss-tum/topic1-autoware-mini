@@ -104,7 +104,7 @@
                                     "sensor_tick": 0.1
                                 },
                                 {
-                                    "type": "sensor.other.imu",
+                                    "type": "sensor.lidar.ray_cast",
                                     "id": "lidar_front/os_sensor",
                                     "spawn_point": {"x": 0.8559, "y": 0.0642, "z": -0.4051, "roll": 0.229, "pitch": -0.526, "yaw": 49.512},
                                     "range": 120,

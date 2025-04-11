@@ -5,12 +5,13 @@ import message_filters
 
 import numpy as np
 import traceback
+import time
 
 from scipy.spatial.distance import cdist
 from lapsolver import solve_dense
 
 from autoware_msgs.msg import DetectedObjectArray
-from std_msgs.msg import ColorRGBA
+from std_msgs.msg import ColorRGBA,Float64MultiArray,msg
 
 from helpers.geometry import get_vector_norm_3d
 from helpers.detection import calculate_iou, get_axis_oriented_bounding_box
@@ -25,14 +26,18 @@ class LidarRadarFusion:
         self.radar_speed_threshold = rospy.get_param("~radar_speed_threshold")  # Threshold for filtering out stationary objects based on speed
         self.association_method = rospy.get_param('~association_method',)
         self.max_euclidean_distance = rospy.get_param('~max_euclidean_distance')
-
+ 
         # Publisher
         self.detected_object_array_pub = rospy.Publisher('detected_objects', DetectedObjectArray, queue_size=1, tcp_nodelay=True)
 
         # Subscribers
         radar_detections_sub = message_filters.Subscriber('radar/detected_objects', DetectedObjectArray, queue_size=1, buff_size=2**20, tcp_nodelay=True)
         lidar_detections_sub = message_filters.Subscriber('lidar/detected_objects', DetectedObjectArray, queue_size=1, buff_size=2**20, tcp_nodelay=True)
-
+        self.exec_time_pub = rospy.Publisher(
+                              f"/{rospy.get_name()}/exec_time_with_stamp",
+                              Float64MultiArray,
+                              queue_size=10
+                             )   
         # Sync
         ts = message_filters.ApproximateTimeSynchronizer([lidar_detections_sub, radar_detections_sub], queue_size=20, slop=0.06)
         ts.registerCallback(self.lidar_radar_callback)
@@ -45,7 +50,15 @@ class LidarRadarFusion:
         lidar_detections: DetectedObjectArray
         publish: DetectedObjectArray
         """
+        start_time = time.time()
         try:
+         stampe = msg.header.stamp.to_sec()
+         if stampe == 0.0:
+          raise ValueError("Zero stamp")
+        except:
+         stampe = rospy.get_rostime().to_sec()
+        try:
+            
             if self.association_method == 'iou':
                 # Collect the axis oriented bounding boxes for the lidar objects and the radar objects
                 lidar_objects_bboxes = np.array([get_axis_oriented_bounding_box(obj) for obj in lidar_detections.objects], dtype=np.float32)
@@ -109,9 +122,14 @@ class LidarRadarFusion:
                         max_id += 1
                         radar_detection.id = max_id
                         final_detections.objects.append(radar_detection)
+            exec_duration = time.time() - start_time
+            timing_msg = Float64MultiArray()
+            timing_msg.data = [stampe, exec_duration]
+            self.exec_time_pub.publish(timing_msg)
 
+            rospy.loginfo(f"[{rospy.get_name()}] Exec time: {exec_duration:.6f}s | Stamp: {stampe:.3f}")
             self.detected_object_array_pub.publish(final_detections)
-
+  
         except Exception as e:
             rospy.logerr_throttle(10, "%s - Exception in callback: %s", rospy.get_name(), traceback.format_exc())
 

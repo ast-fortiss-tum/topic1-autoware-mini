@@ -6,7 +6,7 @@ import time
 from autoware_msgs.msg import TrafficLightResultArray
 from visualization_msgs.msg import MarkerArray, Marker
 from geometry_msgs.msg import Point
-from std_msgs.msg import ColorRGBA
+from std_msgs.msg import ColorRGBA,Float64MultiArray
 
 from helpers.lanelet2 import load_lanelet2_map
 
@@ -57,6 +57,11 @@ class Lanelet2MapVisualizer:
         markers_pub.publish(marker_array)
 
         # Special publisher for stop line markers
+        self.exec_time_pub = rospy.Publisher(
+                              f"/{rospy.get_name()}/exec_time_with_stamp",
+                              Float64MultiArray,
+                              queue_size=10
+                             )   
         self.stop_line_markers_pub = rospy.Publisher('stop_line_markers', MarkerArray, queue_size=10, latch=True, tcp_nodelay=True)
         rospy.Subscriber("/detection/traffic_light_status", TrafficLightResultArray, self.traffic_light_status_callback, queue_size=1, tcp_nodelay=True)
 
@@ -64,6 +69,13 @@ class Lanelet2MapVisualizer:
                       len(self.lanelet2_map.laneletLayer), len(self.lanelet2_map.regulatoryElementLayer), lanelet2_map_name)
 
     def traffic_light_status_callback(self, msg):
+        start_time = time.time()
+        try:
+         stampe = msg.header.stamp.to_sec()
+         if stampe == 0.0:
+          raise ValueError("Zero stamp")
+        except:
+         stampe = rospy.get_rostime().to_sec()   
         marker_array = MarkerArray()
         # delete all previous markers
         marker = Marker()
@@ -103,7 +115,12 @@ class Lanelet2MapVisualizer:
 
             # record the state of this stop line
             states[result.lane_id] = result.recognition_result_str
+        exec_duration = time.time() - start_time
+        timing_msg = Float64MultiArray()
+        timing_msg.data = [stampe, exec_duration]
+        self.exec_time_pub.publish(timing_msg)
 
+        rospy.loginfo(f"[{rospy.get_name()}] Exec time: {exec_duration:.6f}s | Stamp: {stampe:.3f}")
         self.stop_line_markers_pub.publish(marker_array)
 
     def run(self):

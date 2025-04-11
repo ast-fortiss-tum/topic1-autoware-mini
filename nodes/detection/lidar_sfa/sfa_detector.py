@@ -8,7 +8,7 @@ from numpy.lib.recfunctions import structured_to_unstructured
 from ros_numpy import numpify
 
 from sensor_msgs.msg import PointCloud2
-from std_msgs.msg import ColorRGBA
+from std_msgs.msg import ColorRGBA,Float64MultiArray
 from autoware_msgs.msg import DetectedObjectArray, DetectedObject
 
 import onnxruntime
@@ -16,7 +16,7 @@ import onnxruntime
 from helpers.geometry import get_orientation_from_heading
 from helpers.detection import create_hull
 from helpers.transform import transform_pose
-
+import time 
 
 LIGHT_BLUE = ColorRGBA(0.5, 0.5, 1.0, 0.8)
 
@@ -43,7 +43,11 @@ class SFADetector:
         self.onnx_path = rospy.get_param("~onnx_path")  # path of the trained model
         self.load_onnx(self.onnx_path) # get onnx model
         rospy.loginfo("%s - loaded ONNX model file %s", rospy.get_name(), self.onnx_path)
-
+        self.exec_time_pub = rospy.Publisher(
+                              f"/{rospy.get_name()}/exec_time_with_stamp",
+                              Float64MultiArray,
+                              queue_size=10
+                              )
         input_shape = self.model.get_inputs()[0].shape
         if input_shape[-1] == 608:
             assert tuple(input_shape[1:]) == (3, 608, 608), "Incorrect input shape for short distance model: " + str(input_shape[1:])
@@ -104,7 +108,9 @@ class SFADetector:
         pointcloud: raw lidar data points
         return: None - publish autoware DetectedObjects
         """
+        
         try:
+            
             # get the transform from lidar frame to output frame at the time when the poinctloud msg was published
             transform = self.tf_buffer.lookup_transform(self.output_frame, pointcloud.header.frame_id, pointcloud.header.stamp, rospy.Duration(self.transform_timeout))
         except (TransformException, rospy.ROSTimeMovedBackwardsException) as e:
@@ -124,6 +130,7 @@ class SFADetector:
         final_detections = self.detect(points)
         detected_objects_array.objects = self.generate_autoware_objects(final_detections, pointcloud.header, transform)
         self.detected_object_array_pub.publish(detected_objects_array)
+         
 
     def detect(self, points):
         front_points = self.get_filtered_points(points, is_front=True)

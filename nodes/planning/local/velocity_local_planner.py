@@ -6,7 +6,7 @@ import threading
 import numpy as np
 from shapely.geometry import Polygon, LineString, Point as ShapelyPoint
 from shapely import prepare
-
+import time 
 from autoware_msgs.msg import Lane, DetectedObjectArray, TrafficLightResultArray
 from geometry_msgs.msg import PoseStamped, TwistStamped
 
@@ -14,7 +14,7 @@ from helpers.lanelet2 import load_lanelet2_map, get_stoplines, get_crosswalks
 from helpers.geometry import get_distance_between_two_points_2d, project_vector_to_heading
 from helpers.shapely import convert_to_shapely_points_list, get_polygon_width
 from helpers.path import Path
-
+from std_msgs.msg import Float64MultiArray
 
 class VelocityLocalPlanner:
 
@@ -53,7 +53,11 @@ class VelocityLocalPlanner:
 
         # Publishers
         self.local_path_pub = rospy.Publisher('local_path', Lane, queue_size=1, tcp_nodelay=True)
-
+        self.exec_time_pub = rospy.Publisher(
+                              f"/{rospy.get_name()}/exec_time_with_stamp",
+                              Float64MultiArray,
+                              queue_size=10
+                             ) 
         # Subscribers
         rospy.Subscriber('smoothed_path', Lane, self.path_callback, queue_size=None, tcp_nodelay=True)
         rospy.Subscriber('/localization/current_pose', PoseStamped, self.current_pose_callback, queue_size=1, tcp_nodelay=True)
@@ -96,6 +100,13 @@ class VelocityLocalPlanner:
 
 
     def detected_objects_callback(self, msg):
+        start_time = time.time()
+        try:
+         stampe = msg.header.stamp.to_sec()
+         if stampe == 0.0:
+          raise ValueError("Zero stamp")
+        except:
+         stampe = rospy.get_rostime().to_sec() 
         with self.lock:
             output_frame = self.output_frame
             global_path = self.global_path
@@ -258,7 +269,12 @@ class VelocityLocalPlanner:
                 # from stop point onwards all speeds are set to zero
                 if math.isclose(wp.twist.twist.linear.x, 0.0):
                     zero_speeds_onwards = True
+        exec_duration = time.time() - start_time
+        timing_msg = Float64MultiArray()
+        timing_msg.data = [stampe, exec_duration]
+        self.exec_time_pub.publish(timing_msg)
 
+        rospy.loginfo(f"[{rospy.get_name()}] Exec time: {exec_duration:.6f}s | Stamp: {stampe:.3f}")
         self.publish_local_path_wp(local_path.waypoints, msg.header.stamp, output_frame, closest_object_distance, closest_object_velocity, local_path_blocked, stopping_point_distance)
 
     def publish_local_path_wp(self, local_path_waypoints, stamp, output_frame, closest_object_distance=0.0, closest_object_velocity=0.0, local_path_blocked=False, stopping_point_distance=0.0):

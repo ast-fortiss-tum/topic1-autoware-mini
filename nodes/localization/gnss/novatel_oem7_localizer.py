@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import math
+import time
 import rospy
 import message_filters
 from tf.transformations import quaternion_from_euler
@@ -13,7 +14,7 @@ from sensor_msgs.msg import Imu
 from std_srvs.srv import Empty, EmptyResponse
 from ros_numpy import numpify, msgify
 import numpy as np
-
+from std_msgs.msg import Float64MultiArray
 from localization.WGS84ToUTMTransformer import WGS84ToUTMTransformer
 from localization.WGS84ToLest97Transformer import WGS84ToLest97Transformer
 
@@ -30,7 +31,11 @@ class NovatelOem7Localizer:
         self.lest97_origin_easting = rospy.get_param("lest97_origin_easting")
         self.use_msl_height = rospy.get_param("~use_msl_height")
         self.child_frame = rospy.get_param("~child_frame")
-
+        self.exec_time_pub = rospy.Publisher(
+                              f"/{rospy.get_name()}/exec_time_with_stamp",
+                              Float64MultiArray,
+                              queue_size=10
+                             ) 
         # variable to store undulation value from bestpos message
         self.undulation = 0.0
         self.current_pose = None
@@ -85,7 +90,13 @@ class NovatelOem7Localizer:
 
 
     def synchronized_callback(self, inspva_msg, imu_msg):
-
+        start_time = time.time()
+        try:
+         stampe = inspva_msg.header.stamp.to_sec()
+         if stampe == 0.0:
+          raise ValueError("Zero stamp")
+        except:
+         stampe = rospy.get_rostime().to_sec()
         stamp = inspva_msg.header.stamp
 
         # transform GNSS coordinates and correct azimuth
@@ -118,12 +129,18 @@ class NovatelOem7Localizer:
             new_current_pose_matrix = self.relative_pose_matrix.dot(current_pose_matrix)
             # replace current_pose with new_current_pose
             current_pose = msgify(Pose, new_current_pose_matrix)
+        exec_duration = time.time() - start_time
+        timing_msg = Float64MultiArray()
+        timing_msg.data = [stampe, exec_duration]
+        self.exec_time_pub.publish(timing_msg)
 
+        rospy.loginfo(f"[{rospy.get_name()}] Exec time: {exec_duration:.6f}s | Stamp: {stampe:.3f}")
         # Publish 
         self.publish_current_pose(stamp, current_pose)
         self.publish_current_velocity(stamp, linear_velocity, angular_velocity)
         self.publish_map_to_baselink_tf(stamp, current_pose)
         self.publish_odometry(stamp, linear_velocity, current_pose, angular_velocity)
+ 
 
     def bestpos_callback(self, bestpos_msg):
         self.undulation = bestpos_msg.undulation

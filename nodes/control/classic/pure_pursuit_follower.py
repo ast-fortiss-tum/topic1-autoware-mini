@@ -5,6 +5,7 @@ import math
 import message_filters
 import threading
 import traceback
+import time 
 from shapely.geometry import Point as ShapelyPoint
 from shapely import distance
 
@@ -13,7 +14,7 @@ from helpers.path import Path
 
 from visualization_msgs.msg import MarkerArray, Marker
 from geometry_msgs.msg import Pose, PoseStamped, TwistStamped, Point
-from std_msgs.msg import ColorRGBA, Float32MultiArray
+from std_msgs.msg import ColorRGBA, Float32MultiArray,Float64MultiArray
 from autoware_msgs.msg import Lane, VehicleCmd
 
 
@@ -47,7 +48,11 @@ class PurePursuitFollower:
         if self.publish_debug_info:
             self.pure_pursuit_markers_pub = rospy.Publisher('follower_markers', MarkerArray, queue_size=1, tcp_nodelay=True)
             self.follower_debug_pub = rospy.Publisher('follower_debug', Float32MultiArray, queue_size=1, tcp_nodelay=True)
-
+        self.exec_time_pub = rospy.Publisher(
+                              f"/{rospy.get_name()}/exec_time_with_stamp",
+                              Float64MultiArray,
+                              queue_size=10
+                              ) 
         # Subscribers
         rospy.Subscriber('/planning/local_path', Lane, self.path_callback, queue_size=1, buff_size=2**20, tcp_nodelay=True)
         current_pose_sub = message_filters.Subscriber('/localization/current_pose', PoseStamped, queue_size=1, tcp_nodelay=True)
@@ -76,7 +81,13 @@ class PurePursuitFollower:
             self.stopping_point_distance = stopping_point_distance
 
     def current_status_callback(self, current_pose_msg, current_velocity_msg):
-
+        start_time1 = time.time()
+        try:
+         stampe = current_pose_msg.header.stamp.to_sec()
+         if stampe == 0.0:
+          raise ValueError("Zero stamp")
+        except:
+         stampe = rospy.get_rostime().to_sec()
         try:
             if self.publish_debug_info:
                 start_time = rospy.get_time()
@@ -170,7 +181,12 @@ class PurePursuitFollower:
                 lookahead_point = Point(x=lookahead_point.x, y=lookahead_point.y, z=current_pose_msg.pose.position.z)
                 self.publish_pure_pursuit_markers(current_pose_msg.header, current_pose_msg.pose.position, lookahead_point, heading_angle_difference)
                 self.follower_debug_pub.publish(Float32MultiArray(data=[(rospy.get_time() - start_time), current_heading, lookahead_heading, heading_angle_difference, cross_track_error, target_velocity]))
+            exec_duration = time.time() - start_time1
+            timing_msg = Float64MultiArray()
+            timing_msg.data = [stampe, exec_duration]
+            self.exec_time_pub.publish(timing_msg)
 
+            rospy.loginfo(f"[{rospy.get_name()}] Exec time: {exec_duration:.6f}s | Stamp: {stampe:.3f}")
         except Exception as e:
             rospy.logerr_throttle(10, "%s - Exception in callback: %s", rospy.get_name(), traceback.format_exc())
 

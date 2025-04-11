@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import math
+import time
 import rospy
 import numpy as np
 import cv2
@@ -11,7 +12,7 @@ from ros_numpy import numpify, msgify
 
 from sensor_msgs.msg import PointCloud2
 from autoware_msgs.msg import DetectedObjectArray, DetectedObject
-from std_msgs.msg import ColorRGBA, Header
+from std_msgs.msg import ColorRGBA, Header,Float64MultiArray
 from geometry_msgs.msg import Point32, Quaternion
 
 from helpers.geometry import get_orientation_from_heading
@@ -35,8 +36,19 @@ class ClusterDetector:
         rospy.Subscriber('points_clustered', PointCloud2, self.cluster_callback, queue_size=1, buff_size=2**24, tcp_nodelay=True)
 
         rospy.loginfo("%s - initialized", rospy.get_name())
-
+        self.exec_time_pub = rospy.Publisher(
+                              f"/{rospy.get_name()}/exec_time_with_stamp",
+                              Float64MultiArray,
+                              queue_size=10
+                              ) 
     def cluster_callback(self, msg):
+        start_time =  time.time()
+        try:
+         stampe = msg.header.stamp.to_sec()
+         if stampe == 0.0:
+          raise ValueError("Zero stamp")
+        except:
+         stampe = rospy.get_rostime().to_sec()
         data = numpify(msg)
 
         # make copy of labels
@@ -137,10 +149,15 @@ class ClusterDetector:
                 object.convex_hull.polygon.points = [Point32(x, y, center_z) for x, y in hull_points]
 
             objects.objects.append(object)
+        exec_duration = time.time() - start_time
+        timing_msg = Float64MultiArray()
+        timing_msg.data = [stampe, exec_duration]
+        self.exec_time_pub.publish(timing_msg)
 
+        rospy.loginfo(f"[{rospy.get_name()}] Exec time: {exec_duration:.6f}s | Stamp: {stampe:.3f}")
         # publish detected objects message
         self.objects_pub.publish(objects)
-
+   
     def run(self):
         rospy.spin()
 

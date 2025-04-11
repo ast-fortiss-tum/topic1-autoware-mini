@@ -4,7 +4,8 @@ import rospy
 import math
 import numpy as np
 from autoware_msgs.msg import DetectedObjectArray, Lane, Waypoint
-
+import time 
+from std_msgs.msg import Float64MultiArray
 from helpers.geometry import get_heading_from_vector, get_vector_norm_3d, get_heading_between_two_points, get_distance_between_two_points_2d, create_vector_from_heading_and_scalar
 from helpers.lanelet2 import load_lanelet2_map
 import lanelet2
@@ -146,7 +147,7 @@ class MapBasedPredictor:
 
         # Publish predicted objects
         self.predicted_objects_pub.publish(msg)
-
+  
     def run(self):
         rospy.spin()
 

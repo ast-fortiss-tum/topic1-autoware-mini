@@ -11,6 +11,8 @@ from autoware_msgs.msg import TrafficLightResult, TrafficLightResultArray
 
 from localization.SimulationToUTMTransformer import SimulationToUTMTransformer
 from helpers.lanelet2 import get_stoplines_center, load_lanelet2_map
+from std_msgs.msg import Float64MultiArray 
+import time
 
 # Carla to Autoware traffic light status mapping
 CARLA_TO_AUTOWARE_TFL_MAP = {
@@ -101,10 +103,11 @@ class CarlaTrafficLightDetector:
         """
         callback CarlaTrafficLightStatusList
         """
-
+   
+        
         tfl_status = TrafficLightResultArray()
         tfl_status.header.stamp = rospy.Time.now()
-
+     
         for light in msg.traffic_lights:
 
             if light.id not in self.light_id_to_stopline_id_map:
@@ -123,6 +126,7 @@ class CarlaTrafficLightDetector:
                 tfl_status.results.append(tfl_result)
         
         self.tfl_status_pub.publish(tfl_status)
+
 
     def run(self):
         rospy.spin()

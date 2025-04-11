@@ -6,7 +6,8 @@ from scipy.optimize import linear_sum_assignment
 from scipy.spatial.distance import cdist
 from autoware_msgs.msg import DetectedObjectArray
 from helpers.detection import calculate_iou, get_axis_oriented_bounding_box
-
+import time 
+from std_msgs.msg import Float64MultiArray
 class EMATracker:
     def __init__(self):
 
@@ -32,7 +33,11 @@ class EMATracker:
         ])
         self.track_id_counter = 0
         self.stamp = None
-
+        self.exec_time_pub = rospy.Publisher(
+                              f"/{rospy.get_name()}/exec_time_with_stamp",
+                              Float64MultiArray,
+                              queue_size=10
+                             )   
         # Publishers
         self.tracked_objects_pub = rospy.Publisher('tracked_objects', DetectedObjectArray, queue_size=1, tcp_nodelay=True)
 
@@ -43,6 +48,13 @@ class EMATracker:
         ### 1. PREPARE DETECTIONS ###
 
         # convert detected objects into Numpy array
+        start_time = time.time()
+        try:
+         stampe = msg.header.stamp.to_sec()
+         if stampe == 0.0:
+          raise ValueError("Zero stamp")
+        except:
+         stampe = rospy.get_rostime().to_sec()
         detected_objects = msg.objects
         detected_objects_array = np.empty((len(detected_objects)), dtype=self.tracked_objects_array.dtype)
         for i, obj in enumerate(detected_objects):
@@ -176,6 +188,7 @@ class EMATracker:
         for idx in sorted(stale_track_indices, reverse=True):
             del self.tracked_objects[idx]
         self.tracked_objects_array = np.delete(self.tracked_objects_array, stale_track_indices, axis=0)
+        
         assert len(self.tracked_objects) == len(self.tracked_objects_array), str(len(self.tracked_objects)) + ' ' + str(len(self.tracked_objects_array))
 
         # add new detections
@@ -199,8 +212,14 @@ class EMATracker:
         tracked_objects_msg.header.stamp = msg.header.stamp
         tracked_objects_msg.header.frame_id = msg.header.frame_id
         tracked_objects_msg.objects = tracked_objects
-        self.tracked_objects_pub.publish(tracked_objects_msg)
+        exec_duration = time.time() - start_time
+        timing_msg = Float64MultiArray()
+        timing_msg.data = [stampe, exec_duration]
+        self.exec_time_pub.publish(timing_msg)
 
+        rospy.loginfo(f"[{rospy.get_name()}] Exec time: {exec_duration:.6f}s | Stamp: {stampe:.3f}")
+        self.tracked_objects_pub.publish(tracked_objects_msg)
+ 
     def run(self):
         rospy.spin()
 

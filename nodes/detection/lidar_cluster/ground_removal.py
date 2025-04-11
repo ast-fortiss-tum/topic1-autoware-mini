@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import math
+import time
 
 import rospy
 import numpy as np
@@ -8,6 +9,8 @@ import cv2
 
 from ros_numpy import numpify, msgify
 from sensor_msgs.msg import PointCloud2
+from std_msgs.msg import Float64MultiArray
+
 
 class GroundRemovalNode:
     def __init__(self):
@@ -25,7 +28,11 @@ class GroundRemovalNode:
         self.width = int(math.ceil((self.max_x - self.min_x) / self.cell_size))
         self.height = int(math.ceil((self.max_y - self.min_y) / self.cell_size))
         self.cols = np.empty((self.width, self.height), dtype=np.float32)
-
+        self.exec_time_pub = rospy.Publisher(
+                              f"/{rospy.get_name()}/exec_time_with_stamp",
+                              Float64MultiArray,
+                              queue_size=10
+                              )       
         self.ground_pub = rospy.Publisher('points_ground', PointCloud2, queue_size=1, tcp_nodelay=True)
         self.no_ground_pub = rospy.Publisher('points_no_ground', PointCloud2, queue_size=1, tcp_nodelay=True)
         rospy.Subscriber('points_raw', PointCloud2, self.pointcloud_callback, queue_size=1, buff_size=2**24, tcp_nodelay=True)
@@ -33,6 +40,13 @@ class GroundRemovalNode:
         rospy.loginfo("%s - initialized", rospy.get_name())
 
     def pointcloud_callback(self, msg):
+        start_time = time.time()
+        try:
+         stampe = msg.header.stamp.to_sec()
+         if stampe == 0.0:
+          raise ValueError("Zero stamp")
+        except:
+         stampe = rospy.get_rostime().to_sec()
         data = numpify(msg)
         
         # filter out of range points
@@ -86,8 +100,14 @@ class GroundRemovalNode:
         ground_msg = msgify(PointCloud2, ground_data)
         ground_msg.header.stamp = msg.header.stamp
         ground_msg.header.frame_id = msg.header.frame_id
-        self.ground_pub.publish(ground_msg)
+        exec_duration = time.time() - start_time
+        timing_msg = Float64MultiArray()
+        timing_msg.data = [stampe, exec_duration]
+        self.exec_time_pub.publish(timing_msg)
 
+        rospy.loginfo(f"[{rospy.get_name()}] Exec time: {exec_duration:.6f}s | Stamp: {stampe:.3f}")
+        self.ground_pub.publish(ground_msg)
+   
     def run(self):
         rospy.spin()
 

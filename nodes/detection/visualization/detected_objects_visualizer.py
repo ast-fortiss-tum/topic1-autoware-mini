@@ -7,8 +7,8 @@ from shapely.geometry import Polygon
 from autoware_msgs.msg import DetectedObjectArray
 from visualization_msgs.msg import MarkerArray, Marker
 from geometry_msgs.msg import Point, Quaternion
-from std_msgs.msg import Header, ColorRGBA
-
+from std_msgs.msg import Header, ColorRGBA, Float64MultiArray
+import time
 from helpers.shapely import get_polygon_width
 from helpers.geometry import get_orientation_from_heading
 
@@ -22,6 +22,7 @@ class DetectedObjectsVisualizer:
         rospy.loginfo("%s - initialized", rospy.get_name())
 
     def objects_callback(self, msg):
+ 
         header = Header()
         header.stamp = msg.header.stamp
         header.frame_id = msg.header.frame_id
@@ -170,7 +171,7 @@ class DetectedObjectsVisualizer:
 
         # publish markers
         self.markers_pub.publish(markers)
-
+ 
     def run(self):
         rospy.spin()
 

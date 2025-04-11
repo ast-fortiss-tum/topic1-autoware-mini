@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 
+import time
 import rospy
 import math
-from std_msgs.msg import ColorRGBA
+from std_msgs.msg import ColorRGBA,Float64MultiArray
 from novatel_oem7_msgs.msg import INSPVA, BESTPOS
 from jsk_rviz_plugins.msg import OverlayText
 
@@ -67,7 +68,11 @@ class NovatelOem7Visualizer:
         self.location_accuracy_stdev_bad = rospy.get_param("~location_accuracy_stdev_bad")
         self.differential_age_good = rospy.get_param("~differential_age_good")
         self.differential_age_bad = rospy.get_param("~differential_age_bad")
-
+        self.exec_time_pub = rospy.Publisher(
+                              f"/{rospy.get_name()}/exec_time_with_stamp",
+                              Float64MultiArray,
+                              queue_size=10
+                             ) 
         # Publishers
         self.gnss_general_pub = rospy.Publisher('gnss_general', OverlayText, queue_size=1)
         self.gnss_detailed_pub = rospy.Publisher('gnss_detailed', OverlayText, queue_size=1)
@@ -95,7 +100,13 @@ class NovatelOem7Visualizer:
     def bestpos_callback(self, msg):
 
         ################# inspva_status
-
+        start_time = time.time()
+        try:
+         stampe = msg.header.stamp.to_sec()
+         if stampe == 0.0:
+          raise ValueError("Zero stamp")
+        except:
+         stampe = rospy.get_rostime().to_sec()
         inspva_status_text = "INS Status: "
         if self.inspva_status_text == "":
             inspva_status_text += "<span style='color: red;'>{}</span>\n".format("No INS status received")
@@ -150,11 +161,16 @@ class NovatelOem7Visualizer:
         else:
             gnss_general_text = "<span style='color: yellow;'>Warning</span>"
         
+        exec_duration = time.time() - start_time
+        timing_msg = Float64MultiArray()
+        timing_msg.data = [stampe, exec_duration]
+        self.exec_time_pub.publish(timing_msg)
 
+        rospy.loginfo(f"[{rospy.get_name()}] Exec time: {exec_duration:.6f}s | Stamp: {stampe:.3f}")
         self.publish_gnss_general(gnss_general_text)
         self.publish_gnss_detailed(inspva_status_text + bestpos_pos_type_text + num_sol_svs_text + location_stdev_text + diff_age_text)
 
-
+       
     def publish_gnss_general(self, gnss_general_text):
 
         gnss_general = OverlayText()

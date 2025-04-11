@@ -10,11 +10,11 @@ from tf2_ros import Buffer, TransformListener, TransformException
 from geometry_msgs.msg import TwistStamped
 from autoware_msgs.msg import DetectedObject, DetectedObjectArray
 from radar_msgs.msg import RadarTracks
-from std_msgs.msg import ColorRGBA
+from std_msgs.msg import ColorRGBA,Float64MultiArray
 
 from helpers.detection import create_hull
 from helpers.transform import transform_point, transform_vector3
-
+import time
 RED = ColorRGBA(1.0, 0.0, 0.0, 0.8)
 RADAR_CLASSIFICATION = {0:'unknown', 1:'static', 2:'dynamic'}
 
@@ -39,7 +39,7 @@ class RadarDetector:
         self.tf_buffer = Buffer()
         self.tf_listener = TransformListener(self.tf_buffer)
         # allow time for tf buffer to fill
-        rospy.sleep(0.5)
+        rospy.sleep(1)
 
         # Static transform, fetch once
         self.base_link_to_radar_tf = self.tf_buffer.lookup_transform('radar_fc', 'base_link', rospy.Time(0))
@@ -60,6 +60,7 @@ class RadarDetector:
         ego_speed: geometry_msgs/TwistStamped
         publish: DetectedObjectArray
         """
+       
         try:
             detected_objects_array = DetectedObjectArray()
             detected_objects_array.header.frame_id = self.output_frame
@@ -109,6 +110,7 @@ class RadarDetector:
                 detected_objects_array.objects.append(detected_object)
 
             self.detected_objs_pub.publish(detected_objects_array)
+                
 
         except Exception as e:
             rospy.logerr_throttle(10, "%s - Exception in callback: %s", rospy.get_name(), traceback.format_exc())

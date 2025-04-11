@@ -1,20 +1,32 @@
 #!/usr/bin/env python3
 
+import time
 import rospy
 from autoware_msgs.msg import Lane, WaypointState
 from visualization_msgs.msg import MarkerArray, Marker
-from std_msgs.msg import ColorRGBA
+from std_msgs.msg import ColorRGBA,Float64MultiArray
 
 class GlobalPathVisualizer:
     def __init__(self):
 
         # Publishers
         self.global_path_markers_pub = rospy.Publisher('global_path_markers', MarkerArray, queue_size=10, latch=True, tcp_nodelay=True)
-
+        self.exec_time_pub = rospy.Publisher(
+                              f"/{rospy.get_name()}/exec_time_with_stamp",
+                              Float64MultiArray,
+                              queue_size=10
+                             ) 
         # Subscribers
         rospy.Subscriber('global_path', Lane, self.global_path_callback, queue_size=None, tcp_nodelay=True)
 
     def global_path_callback(self, lane):
+        start_time = time.time()
+        try:
+         stampe = lane.header.stamp.to_sec()
+         if stampe == 0.0:
+          raise ValueError("Zero stamp")
+        except:
+         stampe = rospy.get_rostime().to_sec() 
         marker_array = MarkerArray()
 
         if len(lane.waypoints) == 0:
@@ -79,9 +91,14 @@ class GlobalPathVisualizer:
             for waypoint in lane.waypoints:
                 marker.points.append(waypoint.pose.pose.position)
             marker_array.markers.append(marker)
+        exec_duration = time.time() - start_time
+        timing_msg = Float64MultiArray()
+        timing_msg.data = [stampe, exec_duration]
+        self.exec_time_pub.publish(timing_msg)
 
+        rospy.loginfo(f"[{rospy.get_name()}] Exec time: {exec_duration:.6f}s | Stamp: {stampe:.3f}")
         self.global_path_markers_pub.publish(marker_array)
-
+  
     def run(self):
         rospy.spin()
 

@@ -6,7 +6,7 @@ import cv2
 import threading
 import tf2_ros
 import onnxruntime
-
+import time 
 from image_geometry import PinholeCameraModel
 from shapely.geometry import LineString
 
@@ -20,6 +20,7 @@ from cv_bridge import CvBridge, CvBridgeError
 
 from helpers.transform import transform_point
 from helpers.lanelet2 import get_stoplines, get_stoplines_trafficlights_bulbs, load_lanelet2_map
+from std_msgs_msg import Float64MultiArray 
 
 # Classifier outputs 4 classes (LightState)
 CLASSIFIER_RESULT_TO_STRING = {
@@ -115,6 +116,7 @@ class CameraTrafficLightDetector:
 
     def camera_image_callback(self, camera_image_msg):
 
+
         if self.camera_model is None:
             rospy.logwarn_throttle(10, "%s - No camera model received, skipping image", rospy.get_name())
             return
@@ -177,11 +179,11 @@ class CameraTrafficLightDetector:
                     tfl_status.results.append(tfl_result)
 
         self.tfl_status_pub.publish(tfl_status)
-
+       
         if self.tfl_roi_pub.get_num_connections() > 0:
             self.publish_roi_images(image, rois, classes, scores, image_time_stamp)
 
-
+ 
     def calculate_roi_coordinates(self, stoplines_on_path, transform):
 
         rois = []

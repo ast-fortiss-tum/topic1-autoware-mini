@@ -2,6 +2,7 @@
 import math
 import copy
 import itertools
+import time
 
 import rospy
 import lanelet2
@@ -11,7 +12,7 @@ from shapely import distance, Point as ShapelyPoint
 
 from geometry_msgs.msg import PoseStamped, TwistStamped, Point
 from autoware_msgs.msg import Lane, Waypoint, WaypointState
-from std_msgs.msg import ColorRGBA
+from std_msgs.msg import ColorRGBA,Float64MultiArray
 from std_srvs.srv import Empty, EmptyResponse
 from visualization_msgs.msg import MarkerArray, Marker
 
@@ -46,7 +47,11 @@ class Lanelet2GlobalPlanner:
         use_custom_origin = rospy.get_param("/localization/use_custom_origin")
         utm_origin_lat = rospy.get_param("/localization/utm_origin_lat")
         utm_origin_lon = rospy.get_param("/localization/utm_origin_lon")
-
+        self.exec_time_pub = rospy.Publisher(
+                              f"/{rospy.get_name()}/exec_time_with_stamp",
+                              Float64MultiArray,
+                              queue_size=10
+                             ) 
         # Internal variables
         self.lanelet_candidates = []
         self.current_location = None
@@ -76,6 +81,13 @@ class Lanelet2GlobalPlanner:
         rospy.Service('cancel_route', Empty, self.cancel_route_callback)
 
     def goal_callback(self, msg):
+        start_time = time.time()
+        try:
+         stampe = msg.header.stamp.to_sec()
+         if stampe == 0.0:
+          raise ValueError("Zero stamp")
+        except:
+         stampe = rospy.get_rostime().to_sec()
         rospy.loginfo("%s - goal position (%f, %f, %f) orientation (%f, %f, %f, %f) in %s frame", rospy.get_name(),
                     msg.pose.position.x, msg.pose.position.y, msg.pose.position.z,
                     msg.pose.orientation.x, msg.pose.orientation.y, msg.pose.orientation.z,
@@ -155,14 +167,21 @@ class Lanelet2GlobalPlanner:
         self.start_point = start_point
         self.lanelet_candidates = lanelet_candidates
         rospy.logdebug("Lanelet candidates: " + str(list(map(len, lanelet_candidates))))
+        exec_duration = time.time() - start_time
+        timing_msg = Float64MultiArray()
+        timing_msg.data = [stampe, exec_duration]
+        self.exec_time_pub.publish(timing_msg)
 
+        rospy.loginfo(f"[{rospy.get_name()}] Exec time: {exec_duration:.6f}s | Stamp: {stampe:.3f}")
         # publish the global path
         waypoints = global_path.extract_waypoints(start_point_distance, new_goal_point_distance, trim=True)
         self.publish_waypoints(waypoints)
+ 
         rospy.loginfo("%s - global path published", rospy.get_name())
-
+        
 
     def current_pose_callback(self, msg):
+
         self.current_location = ShapelyPoint(msg.pose.position.x, msg.pose.position.y, msg.pose.position.z)
 
         if self.goal_point != None:
@@ -173,6 +192,7 @@ class Lanelet2GlobalPlanner:
                 self.lanelet_candidates = []
                 self.publish_waypoints([])
                 rospy.loginfo("%s - goal reached, clearing path!", rospy.get_name())
+                        
 
     def current_velocity_callback(self, msg):
         self.current_speed = msg.twist.linear.x

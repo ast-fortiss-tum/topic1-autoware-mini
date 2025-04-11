@@ -1,14 +1,17 @@
 #!/usr/bin/env python3
+import time
 import traceback
 import numpy as np
 from numpy.lib.recfunctions import structured_to_unstructured, unstructured_to_structured
 
 import rospy
+
 import message_filters
 from tf2_ros import TransformListener, Buffer, TransformException
 
 from sensor_msgs.msg import PointCloud2
 from ros_numpy import numpify, msgify
+from std_msgs.msg import Float64MultiArray
 
 
 class PointsConcatenator:
@@ -33,6 +36,7 @@ class PointsConcatenator:
         points2_msg: sensor_msgs/PointCloud2
         publish: sensor_msgs/PointCloud2
         """
+
         try:
             if points1_msg.header.frame_id != points2_msg.header.frame_id:
                 raise Exception("Pointcloud frame_ids do not match: {} vs {}".format(points1_msg.header.frame_id, points2_msg.header.frame_id))

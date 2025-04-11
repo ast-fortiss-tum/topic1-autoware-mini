@@ -18,7 +18,8 @@ import rospy
 from ackermann_msgs.msg import AckermannDrive
 from autoware_msgs.msg import VehicleCmd, VehicleStatus, Gear
 from carla_msgs.msg import CarlaEgoVehicleInfo, CarlaEgoVehicleStatus
-from std_msgs.msg import Float64, Bool
+from std_msgs.msg import Float64, Bool,Float64MultiArray
+import time 
 
 
 class CarlaVehicleInterface:
@@ -29,7 +30,7 @@ class CarlaVehicleInterface:
         self.max_steer_angle = math.radians(rospy.get_param("~max_steer_angle"))
 
         self.manual_override = False
-
+ 
         # Publishers
         self.ackerman_cmd_pub = rospy.Publisher(
             '/carla/ego_vehicle/ackermann_cmd', AckermannDrive, queue_size=1, tcp_nodelay=True)
@@ -37,7 +38,11 @@ class CarlaVehicleInterface:
             '/carla/ego_vehicle/target_speed', Float64, queue_size=1, tcp_nodelay=True)
         self.vehicle_status_pub = rospy.Publisher(
             '/vehicle/vehicle_status', VehicleStatus, queue_size=1, tcp_nodelay=True)
-
+        self.exec_time_pub = rospy.Publisher(
+                              f"/{rospy.get_name()}/exec_time_with_stamp",
+                              Float64MultiArray,
+                              queue_size=10
+                             ) 
         # Subscribers
         rospy.Subscriber('/control/vehicle_cmd', VehicleCmd,
                          self.vehicle_cmd_callback, queue_size=1, tcp_nodelay=True)
@@ -63,6 +68,7 @@ class CarlaVehicleInterface:
         self.ackerman_cmd_pub.publish(msg)
         # Publish target speed (currently used only by scenario runner)
         self.target_speed_pub.publish(Float64(msg.speed))
+    
 
     def vehicle_info_callback(self, data):
         """

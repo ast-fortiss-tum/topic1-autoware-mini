@@ -11,10 +11,11 @@ import math
 import traceback
 import rospy
 import message_filters
-
+import time
 from sensor_msgs.msg import NavSatFix
 from novatel_oem7_msgs.msg import INSPVA, BESTPOS, InertialSolutionStatus
 from nav_msgs.msg import Odometry
+from std_msgs.msg import Float64MultiArray
 import pyproj
 
 
@@ -23,6 +24,7 @@ class CarlaNovatelDriver():
 
         # Internal parameters
         self.geodesic = pyproj.Geod(ellps='WGS84')
+
 
         # Publishers
         self.inspva_pub = rospy.Publisher("/novatel/oem7/inspva", INSPVA, queue_size=2, tcp_nodelay=True)
