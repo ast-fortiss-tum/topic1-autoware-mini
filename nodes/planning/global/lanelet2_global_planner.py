@@ -239,10 +239,10 @@ class Lanelet2GlobalPlanner:
             self.speed_limit = rospy.get_param("/planning/lanelet2_global_planner/custom_speed_limit")
 
             speed = self.speed_limit / 3.6
-            if 'speed_limit' in lanelet.attributes:
-                speed = min(speed, float(lanelet.attributes['speed_limit']) / 3.6)
-            if 'speed_ref' in lanelet.attributes:
-                speed = min(speed, float(lanelet.attributes['speed_ref']) / 3.6)
+            # if 'speed_limit' in lanelet.attributes:
+            #     speed = min(speed, float(lanelet.attributes['speed_limit']) / 3.6)
+            # if 'speed_ref' in lanelet.attributes:
+            #     speed = min(speed, float(lanelet.attributes['speed_ref']) / 3.6)
 
             # loop over centerline points use enumerate to get index
             for idx, point in enumerate(lanelet.centerline):
