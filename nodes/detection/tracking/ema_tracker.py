@@ -217,7 +217,7 @@ class EMATracker:
         timing_msg.data = [stampe, exec_duration]
         self.exec_time_pub.publish(timing_msg)
 
-        rospy.loginfo(f"[{rospy.get_name()}] Exec time: {exec_duration:.6f}s | Stamp: {stampe:.3f}")
+        # rospy.loginfo(f"[{rospy.get_name()}] Exec time: {exec_duration:.6f}s | Stamp: {stampe:.3f}")
         self.tracked_objects_pub.publish(tracked_objects_msg)
  
     def run(self):

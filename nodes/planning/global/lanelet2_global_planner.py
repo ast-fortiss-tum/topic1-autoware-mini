@@ -37,7 +37,8 @@ class Lanelet2GlobalPlanner:
         self.output_frame = rospy.get_param("~output_frame")
         self.distance_to_goal_limit = rospy.get_param("~distance_to_goal_limit")
         self.distance_to_centerline_limit = rospy.get_param("~distance_to_centerline_limit")
-        self.speed_limit = rospy.get_param("~speed_limit")
+        #self.speed_limit = rospy.get_param("~speed_limit")
+        self.speed_limit = rospy.get_param("~custom_speed_limit")
         self.ego_vehicle_stopped_speed_limit = rospy.get_param("~ego_vehicle_stopped_speed_limit")
         self.lane_change = rospy.get_param("~lane_change")
         self.lanelet_search_radius = rospy.get_param("~lanelet_search_radius")
@@ -172,7 +173,7 @@ class Lanelet2GlobalPlanner:
         timing_msg.data = [stampe, exec_duration]
         self.exec_time_pub.publish(timing_msg)
 
-        rospy.loginfo(f"[{rospy.get_name()}] Exec time: {exec_duration:.6f}s | Stamp: {stampe:.3f}")
+        #rospy.loginfo(f"[{rospy.get_name()}] Exec time: {exec_duration:.6f}s | Stamp: {stampe:.3f}")
         # publish the global path
         waypoints = global_path.extract_waypoints(start_point_distance, new_goal_point_distance, trim=True)
         self.publish_waypoints(waypoints)
@@ -234,6 +235,8 @@ class Lanelet2GlobalPlanner:
 
             if i == len(lanelet_sequence)-1:
                 last_lanelet = True
+                
+            self.speed_limit = rospy.get_param("/planning/lanelet2_global_planner/custom_speed_limit")
 
             speed = self.speed_limit / 3.6
             if 'speed_limit' in lanelet.attributes:
