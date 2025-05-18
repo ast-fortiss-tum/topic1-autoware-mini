@@ -3,8 +3,8 @@ braking_reaction_time: 1.6
 stopping_lateral_distance: 1.35           # m
 slowdown_lateral_distance: 1.60       # m
 waypoint_interval: 1.0          # m
-default_acceleration: 1.5
-default_deceleration: 1.0
+default_acceleration: 2.5 #1
+default_deceleration: 2.0 #1
 max_deceleration: 10.0
 stopping_speed_limit: 1.0
 
@@ -12,7 +12,7 @@ lanelet2_global_planner:
   output_frame: map
   distance_to_goal_limit: 5.0
   distance_to_centerline_limit: 5.0
-  speed_limit: 20.0                 # max velocity for route (km/h), will be replaced by speed taken from map
+  speed_limit: 10.0                 # max velocity for route (km/h), will be replaced by speed taken from map
   custom_speed_limit : 50.0
   ego_vehicle_stopped_speed_limit: 0.1
   lane_change: False

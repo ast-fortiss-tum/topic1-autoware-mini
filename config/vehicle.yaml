@@ -1,6 +1,6 @@
 wheel_base: 2.789
 steer_ratio: 16.135
-acceleration_limit: 1.5
+acceleration_limit: 2.5
 deceleration_limit: 5.0
 
 ssc_interface:
