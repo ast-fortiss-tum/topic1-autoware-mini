@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 
+# EMA TRACKER WITH BUGFIX FOR LOFI/HIFI FROM KAIS M.
+
 import rospy
 import numpy as np
 from scipy.optimize import linear_sum_assignment
@@ -8,6 +10,9 @@ from autoware_msgs.msg import DetectedObjectArray
 from helpers.detection import calculate_iou, get_axis_oriented_bounding_box
 import time 
 from std_msgs.msg import Float64MultiArray
+
+DEBUG_TRACKER=True
+
 class EMATracker:
     def __init__(self):
 
@@ -42,8 +47,49 @@ class EMATracker:
         self.tracked_objects_pub = rospy.Publisher('tracked_objects', DetectedObjectArray, queue_size=1, tcp_nodelay=True)
 
         # Subscribers
+      
         rospy.Subscriber('detected_objects', DetectedObjectArray, self.detected_objects_callback, queue_size=1, buff_size=2**20, tcp_nodelay=True)
+    def print_tracker_debug(self, tag=""):
+     if not DEBUG_TRACKER:
+        return
+     rospy.loginfo(f"[{rospy.get_name()}] DEBUG {tag}:")
+     rospy.loginfo(f"→ {len(self.tracked_objects)} tracked objects")
+     for i, obj in enumerate(self.tracked_objects):
+        pos = obj.pose.position
+        vel = obj.velocity.linear
+        acc = obj.acceleration.linear
+        rospy.loginfo(
+            f"  ID {obj.id} | Pos: ({pos.x:.2f}, {pos.y:.2f}) | Vel: ({vel.x:.2f}, {vel.y:.2f}) | Acc: ({acc.x:.2f}, {acc.y:.2f})"
+        )
+     rospy.loginfo(f"→ Centroids: {self.tracked_objects_array['centroid']}")
+     rospy.loginfo(f"→ Detection counters: {self.tracked_objects_array['detection_counter']}")
+    def check_tracker_consistency(self) -> bool:
+     """
+     Checks and repairs inconsistencies between tracked_objects and tracked_objects_array.
+     Returns True if recovery was successful or unnecessary, False if a full reset was performed.
+     """
+     len_list = len(self.tracked_objects)
+     len_array = len(self.tracked_objects_array)
 
+     if len_list == len_array:
+        return True  # No mismatch
+
+     rospy.logwarn(f"[{rospy.get_name()}] Tracker mismatch: list={len_list}, array={len_array}")
+
+     try:
+        min_len = min(len_list, len_array)
+        self.tracked_objects = self.tracked_objects[:min_len]
+        self.tracked_objects_array = self.tracked_objects_array[:min_len]
+        rospy.loginfo(f"[{rospy.get_name()}] Trimmed tracker to length {min_len}")
+        return True
+     except Exception as e:
+        rospy.logerr(f"[{rospy.get_name()}] Partial recovery failed: {e}")
+        # Fallback: full reset
+        self.tracked_objects.clear()
+        self.tracked_objects_array = np.empty((0,), dtype=self.tracked_objects_array.dtype)
+        self.track_id_counter = 0
+        rospy.logwarn(f"[{rospy.get_name()}] Full tracker reset performed.")
+        return False
     def detected_objects_callback(self, msg):
         ### 1. PREPARE DETECTIONS ###
 
@@ -76,7 +122,10 @@ class EMATracker:
         self.stamp = msg.header.stamp
 
         # move tracked objects forward in time
-        assert len(self.tracked_objects) == len(self.tracked_objects_array), str(len(self.tracked_objects)) + ' ' + str(len(self.tracked_objects_array))
+        if not self.check_tracker_consistency():
+         rospy.logwarn(f"[{rospy.get_name()}] Tracker inconsistent after update. Waiting for recovery...")
+         return
+        self.print_tracker_debug(tag="AFTER CONSISTENCY CHECK")
         position_change = time_delta * self.tracked_objects_array['velocity']
         tracked_object_centroids = self.tracked_objects_array['centroid'].copy()
         tracked_object_centroids += position_change
@@ -152,7 +201,7 @@ class EMATracker:
             self.tracked_objects[track_idx] = detected_obj
         self.tracked_objects_array[['centroid', 'bbox', 'velocity', 'acceleration']][matched_track_indices] = \
             detected_objects_array[['centroid', 'bbox', 'velocity', 'acceleration']][matched_detection_indicies]
-
+        self.print_tracker_debug(tag="AFTER MATCH AND UPDATE")
         ### 6. MANAGE TRACK STATUS ###
 
         # create missed track indices
@@ -188,7 +237,7 @@ class EMATracker:
         for idx in sorted(stale_track_indices, reverse=True):
             del self.tracked_objects[idx]
         self.tracked_objects_array = np.delete(self.tracked_objects_array, stale_track_indices, axis=0)
-        
+        self.print_tracker_debug(tag="AFTER MATCH AND UPDATE")
         assert len(self.tracked_objects) == len(self.tracked_objects_array), str(len(self.tracked_objects)) + ' ' + str(len(self.tracked_objects_array))
 
         # add new detections
@@ -217,7 +266,8 @@ class EMATracker:
         timing_msg.data = [stampe, exec_duration]
         self.exec_time_pub.publish(timing_msg)
 
-        # rospy.loginfo(f"[{rospy.get_name()}] Exec time: {exec_duration:.6f}s | Stamp: {stampe:.3f}")
+        rospy.loginfo(f"[{rospy.get_name()}] Exec time: {exec_duration:.6f}s | Stamp: {stampe:.3f}")
+        self.print_tracker_debug(tag="AFTER MATCH AND UPDATE")
         self.tracked_objects_pub.publish(tracked_objects_msg)
  
     def run(self):
