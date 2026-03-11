@@ -61,7 +61,7 @@ class MqttTrafficLightDetector:
         client.on_connect = self.on_connect
 
         client.tls_set("/etc/ssl/certs/ca-certificates.crt")
-        client.connect(self.mqtt_host, self.mqtt_port, keepalive=10)
+        client.connect(self.mqtt_host, self.mqtt_port, keepalive=20)
         client.loop_start()
 
 

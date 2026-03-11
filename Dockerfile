@@ -1,5 +1,6 @@
 #FROM nvidia/cuda:12.6.3-cudnn-devel-ubuntu20.04
 FROM nvidia/cudagl:11.4.2-devel-ubuntu20.04
+#FROM nvidia/cuda:11.0.3-devel-ubuntu20.04
 
 ARG DISPLAY
 ARG QT_X11_NO_MITSHM
@@ -92,6 +93,10 @@ RUN echo "export CARLA_ROOT=/opt/CARLA_ROOT" >> /root/.bashrc
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
     libcudnn8 libcudnn8-dev
+
+# Install dependencies for GPU acceleration (ONLY FOR GPU ACCELERATED RUNNING)
+# RUN pip install --extra-index-url https://pypi.nvidia.com/ cuml-cu11==22.02
+# RUN pip install --extra-index-url https://pypi.nvidia.com/ cuml-cu11==22.02
 
 # Install tmux for multi-terminal support
 RUN apt install -y tmux 
