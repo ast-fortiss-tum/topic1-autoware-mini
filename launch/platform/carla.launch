@@ -71,5 +71,7 @@
 
   <!-- If traffic is enabled then run traffic generator -->
   <node if="$(arg generate_traffic)" pkg="autoware_mini" type="carla_traffic_generator.sh" name="carla_traffic_generator" output="screen" required="true" />  
-
+  
+  <!-- Test setting initial speed -->
+  <node pkg="topic_tools" type="relay" name="carla_set_target_velocity" args="/initialvelocity /carla/ego_vehicle/control/set_target_velocity" output="screen" required="true"/>
 </launch>

@@ -8,7 +8,7 @@
     <arg name="use_road_area_filter"    default="false"            doc="use road area filter"/>
     <arg name="waypoints_file"          default="waypoints_erm_utm_1m.csv" />
     <arg name="scenario_name"           default=""              doc="scenario name" />
-    <arg name='map_name'                default="$(eval 'tartu_demo_noheight' if scenario_name == '' else 'tartu_demo')" />
+    <arg name='map_name'                default="Town04" />
     <arg name="lanelet2_map_name"       default="$(arg map_name).osm" />
     <arg name="detector"                default="$(eval 'sim' if scenario_name == '' else 'none')" />
     <arg name="tfl_detector"            default="none"          doc="mqtt" />

@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <launch>
 
-  <arg name='map_name'                  default='town01'/>
+  <arg name='map_name'                  default='town04'/>
   <arg name='use_manual_control'        default='false' /><!-- Toggle manual control -->
 
   <!--

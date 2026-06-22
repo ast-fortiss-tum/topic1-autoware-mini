@@ -77,7 +77,6 @@
         <arg name="route_id"                            value="$(arg route_id)" />
         <arg name="scenario_name"                       value="$(arg scenario_name)" />
     </include>
-
     <!-- Rviz -->
     <group if="$(arg rviz)">
         <include file="$(find autoware_mini)/launch/dashboard.launch" />
