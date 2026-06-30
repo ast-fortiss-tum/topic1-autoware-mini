@@ -43,25 +43,7 @@ class DetectedObjectsVisualizer:
             marker.color = object.color
             markers.markers.append(marker)
             
-            # bounding box
-            marker = Marker(header=header)
-            marker.ns = 'bounding_box'
-            marker.id = object.id
-            marker.type = marker.LINE_STRIP
-            marker.action = marker.ADD
-            marker.pose = object.pose
-            marker.scale.x = 0.1
-            marker.color = ColorRGBA(1.0, 0.0, 0.0, 0.8)
-            half_length = object.dimensions.x / 2.0
-            half_width = object.dimensions.y / 2.0
-            marker.points = [
-                Point(-half_length, -half_width, 0.0),
-                Point(-half_length, half_width, 0.0),
-                Point(half_length, half_width, 0.0),
-                Point(half_length, -half_width, 0.0),
-                Point(-half_length, -half_width, 0.0),
-            ]
-            markers.markers.append(marker)
+            # Bounding box marker intentionally disabled for now.
 
             # convex hull
             if len(object.convex_hull.polygon.points) > 0:
@@ -134,12 +116,6 @@ class DetectedObjectsVisualizer:
         for id in delete_ids:
             marker = Marker(header=header)
             marker.ns = 'centroid'
-            marker.id = id
-            marker.action = marker.DELETE
-            markers.markers.append(marker)
-
-            marker = Marker(header=header)
-            marker.ns = 'bounding_box'
             marker.id = id
             marker.action = marker.DELETE
             markers.markers.append(marker)
